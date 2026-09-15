@@ -409,5 +409,5 @@ def register_web_handlers(app):
             filters.TEXT & ~filters.COMMAND,
             handle_web_text,
         ),
-        group=1,
+        group=8,
     )

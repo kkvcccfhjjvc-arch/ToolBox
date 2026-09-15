@@ -485,7 +485,7 @@ def register_image_handlers(app):
             image_text,
             block=False,
         ),
-        group=1,
+        group=2,
     )
 
     app.add_handler(
@@ -494,5 +494,5 @@ def register_image_handlers(app):
             image_media,
             block=False,
         ),
-        group=1,
+        group=2,
     )

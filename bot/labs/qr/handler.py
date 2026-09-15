@@ -352,7 +352,7 @@ def register_qr_handlers(app):
             filters.TEXT & ~filters.COMMAND,
             handle_qr_text,
         ),
-        group=1,
+        group=7,
     )
 
     # QR scanner: normal Telegram photos + image documents
@@ -361,5 +361,5 @@ def register_qr_handlers(app):
             filters.PHOTO | filters.Document.IMAGE,
             handle_qr_image,
         ),
-        group=1,
+        group=7,
     )

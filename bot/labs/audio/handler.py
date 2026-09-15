@@ -643,7 +643,7 @@ def register_audio_handlers(application):
             filters.TEXT & ~filters.COMMAND,
             audio_text,
         ),
-        group=0,
+        group=1,
     )
 
     # بعد فایل‌های صوتی / ویدیویی
