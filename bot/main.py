@@ -23,6 +23,7 @@ from bot.labs.file import register_file_handlers
 from bot.labs.video.handler import register_video_handlers
 from bot.labs.qr import register_qr_handlers
 from bot.labs.web import register_web_handlers
+from bot.labs.developer import register_developer_handlers
 
 
 def main():
@@ -74,6 +75,7 @@ def main():
     register_video_handlers(app)
     register_qr_handlers(app)
     register_web_handlers(app)
+    register_developer_handlers(app)
 
     # =========================
     # CALLBACKS
