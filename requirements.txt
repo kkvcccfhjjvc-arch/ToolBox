@@ -15,3 +15,4 @@ langdetect==1.0.9
 pycountry==24.6.1
 python-dateutil==2.9.0.post0
 croniter==6.0.0
+ffmpeg-python==0.2.0

@@ -10,6 +10,8 @@ from bot.handlers.start import start
 from bot.handlers.admin import admin
 from bot.handlers.help import help_command
 from bot.handlers.callbacks import callbacks
+from bot.labs.audio import register_audio_handlers
+
 
 def main():
     init_db()
@@ -20,12 +22,19 @@ def main():
     app.add_handler(CommandHandler("admin", admin))
     app.add_handler(CommandHandler("help", help_command))
 
+    # Audio Lab handlers must be registered before the global callback handler.
+    register_audio_handlers(app)
+
+    # Global callbacks
     app.add_handler(
         CallbackQueryHandler(callbacks)
     )
 
     print("🧰 Tool Box is running...")
-    print("📢 Force Join:", __import__("config").CHANNEL)
+    print(
+        "📢 Force Join:",
+        __import__("config").CHANNEL
+    )
 
     app.run_polling(
         allowed_updates=[
@@ -33,6 +42,7 @@ def main():
             "callback_query"
         ]
     )
+
 
 if __name__ == "__main__":
     main()
