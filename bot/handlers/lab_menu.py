@@ -40,6 +40,11 @@ async def lab_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await image_menu(update, context)
         return
 
+    if text == "📄 PDF Lab":
+        from bot.labs.pdf.handler import pdf_menu
+        await pdf_menu(update, context)
+        return
+
     await update.message.reply_text(
         f"{LABS[text]}\n\n"
         "🚧 این بخش در حال ساخت است.",

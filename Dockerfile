@@ -3,6 +3,7 @@ FROM python:3.12-slim
 RUN apt-get update && \
     apt-get install -y \
     ffmpeg \
+    poppler-utils \
     tesseract-ocr \
     tesseract-ocr-fas \
     tesseract-ocr-eng \
@@ -20,6 +21,8 @@ COPY . .
 
 RUN mkdir -p /app/temp /app/data
 
-RUN echo "=== TESSERACT LANGUAGES ===" && tesseract --list-langs
+RUN echo "=== TESSERACT ===" && tesseract --list-langs
+
+RUN echo "=== PDF TOOLS ===" && pdftoppm -v 2>&1 | head -1
 
 CMD ["python", "-m", "bot.main"]

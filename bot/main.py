@@ -13,6 +13,7 @@ from bot.handlers.callbacks import callbacks
 from bot.handlers.lab_menu import lab_menu
 from bot.labs.audio import register_audio_handlers
 from bot.labs.image import register_image_handlers
+from bot.labs.pdf import register_pdf_handlers
 
 
 def main():
@@ -27,6 +28,7 @@ def main():
     # Audio Reply Keyboard
     register_audio_handlers(app)
     register_image_handlers(app)
+    register_pdf_handlers(app)
 
     # سایر Lab ها
     from telegram.ext import MessageHandler, filters
