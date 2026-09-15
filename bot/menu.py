@@ -1,25 +1,30 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import ReplyKeyboardMarkup, KeyboardButton
+
 
 def main_menu():
-    return InlineKeyboardMarkup([
+    return ReplyKeyboardMarkup(
         [
-            InlineKeyboardButton("🔤 Font & Text", callback_data="lab_text"),
-            InlineKeyboardButton("🎛️ Audio Lab", callback_data="lab_audio"),
+            [
+                KeyboardButton("🔤 Font & Text"),
+                KeyboardButton("🎛️ Audio Lab"),
+            ],
+            [
+                KeyboardButton("🖼️ Image Lab"),
+                KeyboardButton("📄 PDF Lab"),
+            ],
+            [
+                KeyboardButton("📦 File Lab"),
+                KeyboardButton("🎬 Video Lab"),
+            ],
+            [
+                KeyboardButton("🔲 QR & Barcode"),
+                KeyboardButton("🌐 Web Lab"),
+            ],
+            [
+                KeyboardButton("🛠️ Developer Lab"),
+                KeyboardButton("🧮 Utility Lab"),
+            ],
         ],
-        [
-            InlineKeyboardButton("🖼️ Image Lab", callback_data="lab_image"),
-            InlineKeyboardButton("📄 PDF Lab", callback_data="lab_pdf"),
-        ],
-        [
-            InlineKeyboardButton("📦 File Lab", callback_data="lab_file"),
-            InlineKeyboardButton("🎬 Video Lab", callback_data="lab_video"),
-        ],
-        [
-            InlineKeyboardButton("🔲 QR & Barcode", callback_data="lab_qr"),
-            InlineKeyboardButton("🌐 Web Lab", callback_data="lab_web"),
-        ],
-        [
-            InlineKeyboardButton("🛠️ Developer Lab", callback_data="lab_dev"),
-            InlineKeyboardButton("🧮 Utility Lab", callback_data="lab_util"),
-        ]
-    ])
+        resize_keyboard=True,
+        is_persistent=True,
+    )
