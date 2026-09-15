@@ -1,11 +1,12 @@
 from telegram import Update
 from telegram.ext import ContextTypes
+
 from bot.services.access import check_access
+from bot.menu import main_menu
 
 
 LABS = {
     "🔤 Font & Text": "🔤 Font & Text Lab",
-    "🎛️ Audio Lab": "🎛️ Audio Lab",
     "🖼️ Image Lab": "🖼️ Image Lab",
     "📄 PDF Lab": "📄 PDF Lab",
     "📦 File Lab": "📦 File Lab",
@@ -18,6 +19,9 @@ LABS = {
 
 
 async def lab_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message:
+        return
+
     if not await check_access(update, context):
         return
 
@@ -26,14 +30,14 @@ async def lab_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text not in LABS:
         return
 
-    if text == "🎛️ Audio Lab":
-        await update.message.reply_text(
-            "🎛️ Audio Lab\n\n"
-            "ابزارهای صوتی را انتخاب کنید 👇"
-        )
-        return
+    try:
+        await update.message.delete()
+    except Exception:
+        pass
 
     await update.message.reply_text(
         f"{LABS[text]}\n\n"
-        "🚧 این بخش در حال ساخت است."
+        "🚧 این بخش در حال ساخت است.\n\n"
+        "🎛️ Audio Lab را می‌توانی از منوی پایین انتخاب کنی.",
+        reply_markup=main_menu(),
     )

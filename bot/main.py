@@ -2,8 +2,6 @@ from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
-    MessageHandler,
-    filters,
 )
 
 from config import BOT_TOKEN
@@ -12,8 +10,8 @@ from bot.handlers.start import start
 from bot.handlers.admin import admin
 from bot.handlers.help import help_command
 from bot.handlers.callbacks import callbacks
-from bot.labs.audio import register_audio_handlers
 from bot.handlers.lab_menu import lab_menu
+from bot.labs.audio import register_audio_handlers
 
 
 def main():
@@ -25,16 +23,24 @@ def main():
     app.add_handler(CommandHandler("admin", admin))
     app.add_handler(CommandHandler("help", help_command))
 
-    # Audio Lab handlers must be registered before the global callback handler.
+    # Audio Reply Keyboard
     register_audio_handlers(app)
 
+    # سایر Lab ها
+    from telegram.ext import MessageHandler, filters
+
     app.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, lab_menu)
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            lab_menu,
+        ),
+        group=10,
     )
 
-    # Global callbacks
+    # Callback های قدیمی برای Force Join و بخش‌های دیگر
     app.add_handler(
-        CallbackQueryHandler(callbacks)
+        CallbackQueryHandler(callbacks),
+        group=20,
     )
 
     print("🧰 Tool Box is running...")
@@ -46,7 +52,7 @@ def main():
     app.run_polling(
         allowed_updates=[
             "message",
-            "callback_query"
+            "callback_query",
         ]
     )
 

@@ -1,9 +1,19 @@
 import os
 import uuid
+from pathlib import Path
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import CallbackQueryHandler, MessageHandler, ContextTypes, filters
+from telegram import (
+    Update,
+    ReplyKeyboardMarkup,
+    KeyboardButton,
+)
+from telegram.ext import (
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 
+from bot.services.access import check_access
 from .processor import (
     convert,
     cut,
@@ -20,619 +30,632 @@ from .processor import (
     ffprobe,
 )
 
-TMP = os.path.expanduser("~/ToolBox/temp")
-os.makedirs(TMP, exist_ok=True)
 
-MAX_SIZE = 50 * 1024 * 1024
+BASE = Path("temp/audio")
+BASE.mkdir(parents=True, exist_ok=True)
 
 
 def audio_menu():
-    return InlineKeyboardMarkup([
+    return ReplyKeyboardMarkup(
         [
-            InlineKeyboardButton("🎙️ Voice", callback_data="audio_voice"),
-            InlineKeyboardButton("🔄 Convert", callback_data="audio_convert"),
+            [
+                KeyboardButton("🎙️ Voice"),
+                KeyboardButton("🔄 Convert"),
+            ],
+            [
+                KeyboardButton("✂️ Cut"),
+                KeyboardButton("🔗 Merge"),
+            ],
+            [
+                KeyboardButton("⏩ Speed"),
+                KeyboardButton("🔊 Volume"),
+            ],
+            [
+                KeyboardButton("🎵 Pitch"),
+                KeyboardButton("🔇 Silence"),
+            ],
+            [
+                KeyboardButton("↩️ Reverse"),
+                KeyboardButton("📦 Compress"),
+            ],
+            [
+                KeyboardButton("〰️ Waveform"),
+                KeyboardButton("📊 Spectrogram"),
+            ],
+            [
+                KeyboardButton("🎬 Extract Audio"),
+                KeyboardButton("ℹ️ File Info"),
+            ],
+            [
+                KeyboardButton("🏷️ Metadata"),
+            ],
+            [
+                KeyboardButton("🏠 منوی اصلی"),
         ],
-        [
-            InlineKeyboardButton("✂️ Cut", callback_data="audio_cut"),
-            InlineKeyboardButton("🔗 Merge", callback_data="audio_merge"),
         ],
-        [
-            InlineKeyboardButton("⏩ Speed", callback_data="audio_speed"),
-            InlineKeyboardButton("🔊 Volume", callback_data="audio_volume"),
-        ],
-        [
-            InlineKeyboardButton("🎵 Pitch", callback_data="audio_pitch"),
-            InlineKeyboardButton("🔇 Silence", callback_data="audio_silence"),
-        ],
-        [
-            InlineKeyboardButton("↩️ Reverse", callback_data="audio_reverse"),
-            InlineKeyboardButton("📦 Compress", callback_data="audio_compress"),
-        ],
-        [
-            InlineKeyboardButton("〰️ Waveform", callback_data="audio_waveform"),
-            InlineKeyboardButton("📊 Spectrogram", callback_data="audio_spectrogram"),
-        ],
-        [
-            InlineKeyboardButton("🎬 Extract Audio", callback_data="audio_extract"),
-            InlineKeyboardButton("ℹ️ File Info", callback_data="audio_info"),
-        ],
-        [
-            InlineKeyboardButton("🏷️ Metadata", callback_data="audio_metadata"),
-        ],
-        [
-            InlineKeyboardButton("🔙 منوی اصلی", callback_data="back_main"),
-        ],
-    ])
-
-
-def back_buttons():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🔙 Audio Lab", callback_data="lab_audio")],
-        [InlineKeyboardButton("🏠 منوی اصلی", callback_data="back_main")],
-    ])
+        resize_keyboard=True,
+        is_persistent=True,
+    )
 
 
 def format_menu():
-    return InlineKeyboardMarkup([
+    return ReplyKeyboardMarkup(
         [
-            InlineKeyboardButton("MP3", callback_data="audio_format_mp3"),
-            InlineKeyboardButton("WAV", callback_data="audio_format_wav"),
+            [
+                KeyboardButton("MP3"),
+                KeyboardButton("WAV"),
+            ],
+            [
+                KeyboardButton("OGG"),
+                KeyboardButton("FLAC"),
+            ],
+            [
+                KeyboardButton("M4A"),
+            ],
+            [
+                KeyboardButton("🔙 Audio Lab"),
+            ],
         ],
-        [
-            InlineKeyboardButton("OGG", callback_data="audio_format_ogg"),
-            InlineKeyboardButton("FLAC", callback_data="audio_format_flac"),
-        ],
-        [
-            InlineKeyboardButton("M4A", callback_data="audio_format_m4a"),
-        ],
-        [
-            InlineKeyboardButton("🔙 Audio Lab", callback_data="lab_audio"),
-        ],
-    ])
+        resize_keyboard=True,
+    )
 
 
 def speed_menu():
-    return InlineKeyboardMarkup([
+    return ReplyKeyboardMarkup(
         [
-            InlineKeyboardButton("0.5x", callback_data="audio_speed_value_0.5"),
-            InlineKeyboardButton("0.75x", callback_data="audio_speed_value_0.75"),
+            [
+                KeyboardButton("0.5x"),
+                KeyboardButton("0.75x"),
+            ],
+            [
+                KeyboardButton("1.25x"),
+                KeyboardButton("1.5x"),
+            ],
+            [
+                KeyboardButton("2x"),
+            ],
+            [
+                KeyboardButton("🔙 Audio Lab"),
+            ],
         ],
-        [
-            InlineKeyboardButton("1.25x", callback_data="audio_speed_value_1.25"),
-            InlineKeyboardButton("1.5x", callback_data="audio_speed_value_1.5"),
-        ],
-        [
-            InlineKeyboardButton("2x", callback_data="audio_speed_value_2"),
-        ],
-        [
-            InlineKeyboardButton("🔙 Audio Lab", callback_data="lab_audio"),
-        ],
-    ])
+        resize_keyboard=True,
+    )
 
 
 def volume_menu():
-    return InlineKeyboardMarkup([
+    return ReplyKeyboardMarkup(
         [
-            InlineKeyboardButton("50%", callback_data="audio_volume_value_0.5"),
-            InlineKeyboardButton("75%", callback_data="audio_volume_value_0.75"),
+            [
+                KeyboardButton("50%"),
+                KeyboardButton("75%"),
+            ],
+            [
+                KeyboardButton("100%"),
+                KeyboardButton("125%"),
+            ],
+            [
+                KeyboardButton("150%"),
+                KeyboardButton("200%"),
+            ],
+            [
+                KeyboardButton("🔙 Audio Lab"),
+            ],
         ],
-        [
-            InlineKeyboardButton("100%", callback_data="audio_volume_value_1"),
-            InlineKeyboardButton("125%", callback_data="audio_volume_value_1.25"),
-        ],
-        [
-            InlineKeyboardButton("150%", callback_data="audio_volume_value_1.5"),
-            InlineKeyboardButton("200%", callback_data="audio_volume_value_2"),
-        ],
-        [
-            InlineKeyboardButton("🔙 Audio Lab", callback_data="lab_audio"),
-        ],
-    ])
+        resize_keyboard=True,
+    )
 
 
 def pitch_menu():
-    return InlineKeyboardMarkup([
+    return ReplyKeyboardMarkup(
         [
-            InlineKeyboardButton("-2", callback_data="audio_pitch_value_-2"),
-            InlineKeyboardButton("-1", callback_data="audio_pitch_value_-1"),
+            [
+                KeyboardButton("-2"),
+                KeyboardButton("-1"),
+            ],
+            [
+                KeyboardButton("0"),
+                KeyboardButton("+1"),
+            ],
+            [
+                KeyboardButton("+2"),
+            ],
+            [
+                KeyboardButton("🔙 Audio Lab"),
+            ],
         ],
-        [
-            InlineKeyboardButton("0", callback_data="audio_pitch_value_0"),
-            InlineKeyboardButton("+1", callback_data="audio_pitch_value_1"),
-        ],
-        [
-            InlineKeyboardButton("+2", callback_data="audio_pitch_value_2"),
-        ],
-        [
-            InlineKeyboardButton("🔙 Audio Lab", callback_data="lab_audio"),
-        ],
-    ])
-
-
-async def download_media(message):
-    media = (
-        message.audio
-        or message.voice
-        or message.video
-        or message.document
+        resize_keyboard=True,
     )
+
+
+def cut_menu():
+    return ReplyKeyboardMarkup(
+        [
+            [
+                KeyboardButton("5 ثانیه"),
+                KeyboardButton("10 ثانیه"),
+            ],
+            [
+                KeyboardButton("30 ثانیه"),
+                KeyboardButton("60 ثانیه"),
+            ],
+            [
+                KeyboardButton("🔙 Audio Lab"),
+            ],
+        ],
+        resize_keyboard=True,
+    )
+
+
+def back_menu():
+    return ReplyKeyboardMarkup(
+        [
+            [KeyboardButton("🔙 Audio Lab")],
+            [KeyboardButton("🏠 منوی اصلی")],
+        ],
+        resize_keyboard=True,
+    )
+
+
+async def delete_selection(update):
+    try:
+        if update.message:
+            await update.message.delete()
+    except Exception:
+        pass
+
+
+async def send_audio_menu(update, text=None):
+    if text is None:
+        text = (
+            "🎛️ Audio Lab\n\n"
+            "👇 ابزار صوتی را انتخاب کنید:"
+        )
+
+    await update.message.reply_text(
+        text,
+        reply_markup=audio_menu(),
+    )
+
+
+def new_session():
+    folder = BASE / uuid.uuid4().hex
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder
+
+
+async def download_media(update, context):
+    message = update.message
+
+    media = None
+    filename = "input"
+
+    if message.audio:
+        media = message.audio
+        filename = message.audio.file_name or "audio"
+
+    elif message.voice:
+        media = message.voice
+        filename = "voice.ogg"
+
+    elif message.video:
+        media = message.video
+        filename = message.video.file_name or "video.mp4"
+
+    elif message.document:
+        media = message.document
+        filename = message.document.file_name or "file"
 
     if not media:
         return None
 
-    size = getattr(media, "file_size", 0) or 0
-
-    if size > MAX_SIZE:
-        await message.reply_text("❌ حجم فایل بیشتر از 50MB است.")
+    if getattr(media, "file_size", 0) > 50 * 1024 * 1024:
+        await message.reply_text(
+            "❌ حجم فایل نباید بیشتر از 50MB باشد.",
+            reply_markup=audio_menu(),
+        )
         return None
 
+    folder = context.user_data.get("audio_folder")
+
+    if not folder:
+        folder = new_session()
+        context.user_data["audio_folder"] = str(folder)
+
+    folder = Path(folder)
+
+    ext = Path(filename).suffix or ".bin"
+    path = folder / f"input_{uuid.uuid4().hex}{ext}"
+
     tg_file = await media.get_file()
-
-    filename = getattr(media, "file_name", None)
-    ext = ".bin"
-
-    if filename and "." in filename:
-        ext = "." + filename.rsplit(".", 1)[1].lower()
-
-    path = os.path.join(
-        TMP,
-        f"{uuid.uuid4().hex}{ext}"
-    )
-
-    await tg_file.download_to_drive(path)
+    await tg_file.download_to_drive(str(path))
 
     return path
 
 
-async def send_result(chat, path, caption=None, voice=False):
-    try:
-        if voice:
-            with open(path, "rb") as f:
-                await chat.send_voice(voice=f, caption=caption)
+async def send_result(update, path, caption="✅ انجام شد"):
+    path = Path(path)
 
-        elif path.endswith(".png"):
-            with open(path, "rb") as f:
-                await chat.send_photo(photo=f, caption=caption)
-
-        else:
-            with open(path, "rb") as f:
-                await chat.send_document(
-                    document=f,
-                    caption=caption
-                )
-    finally:
-        try:
-            os.remove(path)
-        except OSError:
-            pass
-
-
-async def audio_callback(update, context):
-    q = update.callback_query
-    await q.answer()
-
-    data = q.data
-
-    if data == "lab_audio":
-        context.user_data.clear()
-
-        await q.edit_message_text(
-            "🎛️ Audio Lab\n\n"
-            "ابزار موردنظر را انتخاب کنید:",
-            reply_markup=audio_menu()
+    if not path.exists():
+        await update.message.reply_text(
+            "❌ فایل خروجی ساخته نشد.",
+            reply_markup=audio_menu(),
         )
         return
 
-    if data == "audio_convert":
-        await q.edit_message_text(
-            "🔄 فرمت خروجی را انتخاب کنید:",
-            reply_markup=format_menu()
+    with open(path, "rb") as f:
+        await update.message.reply_document(
+            document=f,
+            caption=caption,
+            reply_markup=audio_menu(),
         )
+
+
+async def process_audio(update, context):
+    if not await check_access(update, context):
         return
 
-    if data.startswith("audio_format_"):
-        fmt = data.replace("audio_format_", "")
+    action = context.user_data.get("audio_action")
 
-        context.user_data["audio_operation"] = "convert"
-        context.user_data["audio_format"] = "." + fmt
-
-        await q.edit_message_text(
-            f"🔄 تبدیل به {fmt.upper()}\n\n"
-            "📤 فایل را ارسال کنید.",
-            reply_markup=back_buttons()
-        )
+    if not action:
         return
 
-    if data == "audio_speed":
-        await q.edit_message_text(
-            "⏩ سرعت را انتخاب کنید:",
-            reply_markup=speed_menu()
-        )
-        return
-
-    if data.startswith("audio_speed_value_"):
-        value = float(data.replace("audio_speed_value_", ""))
-
-        context.user_data["audio_operation"] = "speed"
-        context.user_data["audio_value"] = value
-
-        await q.edit_message_text(
-            f"⏩ سرعت: {value}x\n\n"
-            "📤 فایل صوتی را ارسال کنید.",
-            reply_markup=back_buttons()
-        )
-        return
-
-    if data == "audio_volume":
-        await q.edit_message_text(
-            "🔊 میزان صدا را انتخاب کنید:",
-            reply_markup=volume_menu()
-        )
-        return
-
-    if data.startswith("audio_volume_value_"):
-        value = float(data.replace("audio_volume_value_", ""))
-
-        context.user_data["audio_operation"] = "volume"
-        context.user_data["audio_value"] = value
-
-        await q.edit_message_text(
-            f"🔊 Volume: {int(value * 100)}%\n\n"
-            "📤 فایل صوتی را ارسال کنید.",
-            reply_markup=back_buttons()
-        )
-        return
-
-    if data == "audio_pitch":
-        await q.edit_message_text(
-            "🎵 Pitch را انتخاب کنید:",
-            reply_markup=pitch_menu()
-        )
-        return
-
-    if data.startswith("audio_pitch_value_"):
-        value = float(data.replace("audio_pitch_value_", ""))
-
-        context.user_data["audio_operation"] = "pitch"
-        context.user_data["audio_value"] = value
-
-        await q.edit_message_text(
-            f"🎵 Pitch: {value:+g}\n\n"
-            "📤 فایل صوتی را ارسال کنید.",
-            reply_markup=back_buttons()
-        )
-        return
-
-    actions = {
-        "audio_voice": ("voice", "🎙️ فایل صوتی را ارسال کنید."),
-        "audio_cut": ("cut", "✂️ فایل صوتی را ارسال کنید."),
-        "audio_merge": ("merge", "🔗 فایل‌های صوتی را ارسال کنید."),
-        "audio_silence": ("silence", "🔇 فایل صوتی را ارسال کنید."),
-        "audio_reverse": ("reverse", "↩️ فایل صوتی را ارسال کنید."),
-        "audio_compress": ("compress", "📦 فایل صوتی را ارسال کنید."),
-        "audio_waveform": ("waveform", "〰️ فایل صوتی را ارسال کنید."),
-        "audio_spectrogram": ("spectrogram", "📊 فایل صوتی را ارسال کنید."),
-        "audio_extract": ("extract", "🎬 فایل ویدئویی را ارسال کنید."),
-        "audio_info": ("info", "ℹ️ فایل را ارسال کنید."),
-        "audio_metadata": ("metadata", "🏷️ فایل صوتی را ارسال کنید."),
-    }
-
-    if data in actions:
-        operation, text = actions[data]
-
-        context.user_data["audio_operation"] = operation
-
-        if operation == "merge":
-            context.user_data["audio_merge_files"] = []
-
-        await q.edit_message_text(
-            text,
-            reply_markup=back_buttons()
-        )
-
-
-async def audio_media_handler(update, context):
-    operation = context.user_data.get("audio_operation")
-
-    if not operation:
-        return
-
-    message = update.message
-
-    if operation == "merge":
-        path = await download_media(message)
-
-        if not path:
-            return
-
-        files = context.user_data.setdefault(
-            "audio_merge_files", []
-        )
-
-        files.append(path)
-
-        keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton(
-                    "✅ پایان و ادغام",
-                    callback_data="audio_merge_done"
-                )
-            ],
-            [
-                InlineKeyboardButton(
-                    "🔙 Audio Lab",
-                    callback_data="lab_audio"
-                )
-            ],
-        ])
-
-        await message.reply_text(
-            f"✅ فایل {len(files)} دریافت شد.\n"
-            "فایل بعدی را بفرستید یا پایان را بزنید.",
-            reply_markup=keyboard
-        )
-
-        return
-
-    path = await download_media(message)
+    path = await download_media(update, context)
 
     if not path:
         return
 
+    folder = Path(context.user_data["audio_folder"])
+
     try:
-        status = await message.reply_text("⏳ در حال پردازش...")
-
-        if operation == "voice":
-            output = await convert(path, ".ogg")
-            await status.delete()
-            await send_result(
-                message.chat,
-                output,
-                "🎙️ Telegram Voice آماده شد.",
-                True
+        if action == "voice":
+            output = folder / "voice.ogg"
+            convert(path, output, "ogg")
+            await update.message.reply_voice(
+                voice=open(output, "rb"),
+                caption="🎙️ آماده شد",
+                reply_markup=audio_menu(),
             )
 
-        elif operation == "convert":
-            output = await convert(
-                path,
-                context.user_data["audio_format"]
+        elif action == "convert":
+            context.user_data["audio_input"] = str(path)
+            await update.message.reply_text(
+                "🔄 فرمت خروجی را انتخاب کنید:",
+                reply_markup=format_menu(),
             )
-
-            await status.delete()
-
-            await send_result(
-                message.chat,
-                output,
-                "🔄 تبدیل فرمت انجام شد."
-            )
-
-        elif operation == "speed":
-            output = await speed(
-                path,
-                context.user_data["audio_value"]
-            )
-
-            await status.delete()
-
-            await send_result(
-                message.chat,
-                output,
-                "⏩ سرعت تغییر کرد."
-            )
-
-        elif operation == "volume":
-            output = await change_volume(
-                path,
-                context.user_data["audio_value"]
-            )
-
-            await status.delete()
-
-            await send_result(
-                message.chat,
-                output,
-                "🔊 Volume تغییر کرد."
-            )
-
-        elif operation == "pitch":
-            output = await pitch(
-                path,
-                context.user_data["audio_value"]
-            )
-
-            await status.delete()
-
-            await send_result(
-                message.chat,
-                output,
-                "🎵 Pitch تغییر کرد."
-            )
-
-        elif operation == "silence":
-            output = await silence_remove(path)
-            await status.delete()
-            await send_result(
-                message.chat,
-                output,
-                "🔇 سکوت‌ها حذف شدند."
-            )
-
-        elif operation == "reverse":
-            output = await reverse(path)
-            await status.delete()
-            await send_result(
-                message.chat,
-                output,
-                "↩️ Reverse انجام شد."
-            )
-
-        elif operation == "compress":
-            output = await compress(path)
-            await status.delete()
-            await send_result(
-                message.chat,
-                output,
-                "📦 فشرده‌سازی انجام شد."
-            )
-
-        elif operation == "waveform":
-            output = await waveform(path)
-            await status.delete()
-            await send_result(
-                message.chat,
-                output,
-                "〰️ Waveform"
-            )
-
-        elif operation == "spectrogram":
-            output = await spectrogram(path)
-            await status.delete()
-            await send_result(
-                message.chat,
-                output,
-                "📊 Spectrogram"
-            )
-
-        elif operation == "extract":
-            output = await extract_audio(path)
-            await status.delete()
-            await send_result(
-                message.chat,
-                output,
-                "🎬 صدا استخراج شد."
-            )
-
-        elif operation in ("info", "metadata"):
-            info = await ffprobe(path)
-            fmt = info.get("format", {})
-            streams = info.get("streams", [])
-
-            if operation == "metadata":
-                tags = fmt.get("tags", {})
-
-                text = "🏷️ Metadata\n\n"
-
-                if tags:
-                    for key, value in tags.items():
-                        text += f"• {key}: {value}\n"
-                else:
-                    text += "Metadataای پیدا نشد."
-
-            else:
-                audio = next(
-                    (
-                        s for s in streams
-                        if s.get("codec_type") == "audio"
-                    ),
-                    None
-                )
-
-                duration = float(
-                    fmt.get("duration", 0) or 0
-                )
-
-                minutes = int(duration // 60)
-                seconds = int(duration % 60)
-
-                size = int(fmt.get("size", 0) or 0)
-
-                text = (
-                    "ℹ️ اطلاعات فایل\n\n"
-                    f"📦 Format: {fmt.get('format_name', '-')}\n"
-                    f"💾 Size: {size / 1024 / 1024:.2f} MB\n"
-                    f"⏱ Duration: {minutes}:{seconds:02d}\n"
-                )
-
-                if audio:
-                    text += (
-                        f"🎵 Codec: {audio.get('codec_name', '-')}\n"
-                        f"🔊 Sample Rate: {audio.get('sample_rate', '-')}\n"
-                        f"🎚 Channels: {audio.get('channels', '-')}\n"
-                    )
-
-            await status.edit_text(
-                text,
-                reply_markup=back_buttons()
-            )
-
             return
 
+        elif action == "speed":
+            context.user_data["audio_input"] = str(path)
+            await update.message.reply_text(
+                "⏩ سرعت را انتخاب کنید:",
+                reply_markup=speed_menu(),
+            )
+            return
+
+        elif action == "volume":
+            context.user_data["audio_input"] = str(path)
+            await update.message.reply_text(
+                "🔊 میزان صدا را انتخاب کنید:",
+                reply_markup=volume_menu(),
+            )
+            return
+
+        elif action == "pitch":
+            context.user_data["audio_input"] = str(path)
+            await update.message.reply_text(
+                "🎵 تغییر Pitch را انتخاب کنید:",
+                reply_markup=pitch_menu(),
+            )
+            return
+
+        elif action == "cut":
+            context.user_data["audio_input"] = str(path)
+            await update.message.reply_text(
+                "✂️ مقدار برش را انتخاب کنید:",
+                reply_markup=cut_menu(),
+            )
+            return
+
+        elif action == "reverse":
+            output = folder / "reverse.mp3"
+            reverse(path, output)
+            await send_result(update, output, "↩️ Reverse انجام شد")
+
+        elif action == "silence":
+            output = folder / "silence_removed.mp3"
+            silence_remove(path, output)
+            await send_result(update, output, "🔇 سکوت حذف شد")
+
+        elif action == "compress":
+            output = folder / "compressed.mp3"
+            compress(path, output)
+            await send_result(update, output, "📦 فشرده‌سازی انجام شد")
+
+        elif action == "waveform":
+            output = folder / "waveform.png"
+            waveform(path, output)
+
+            with open(output, "rb") as f:
+                await update.message.reply_photo(
+                    photo=f,
+                    caption="〰️ Waveform",
+                    reply_markup=audio_menu(),
+                )
+
+        elif action == "spectrogram":
+            output = folder / "spectrogram.png"
+            spectrogram(path, output)
+
+            with open(output, "rb") as f:
+                await update.message.reply_photo(
+                    photo=f,
+                    caption="📊 Spectrogram",
+                    reply_markup=audio_menu(),
+                )
+
+        elif action == "extract":
+            output = folder / "audio.mp3"
+            extract_audio(path, output)
+            await send_result(update, output, "🎬 Audio استخراج شد")
+
+        elif action == "info":
+            info = ffprobe(path)
+
+            await update.message.reply_text(
+                "ℹ️ File Info\n\n"
+                f"{info}",
+                reply_markup=audio_menu(),
+            )
+
+        elif action == "metadata":
+            info = ffprobe(path)
+
+            await update.message.reply_text(
+                "🏷️ Metadata\n\n"
+                f"{info}",
+                reply_markup=audio_menu(),
+            )
+
+        context.user_data.pop("audio_action", None)
+
     except Exception as e:
-        await status.edit_text(
-            f"❌ خطا در پردازش:\n{str(e)[-1200:]}",
-            reply_markup=back_buttons()
+        context.user_data.pop("audio_action", None)
+
+        await update.message.reply_text(
+            f"❌ خطا در پردازش فایل:\n{e}",
+            reply_markup=audio_menu(),
         )
 
-    finally:
-        try:
-            os.remove(path)
-        except OSError:
-            pass
 
-        context.user_data.pop("audio_operation", None)
+async def audio_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await check_access(update, context):
+        return
 
+    text = update.message.text
 
-async def merge_done(update, context):
-    q = update.callback_query
-    await q.answer()
+    await delete_selection(update)
 
-    files = context.user_data.get("audio_merge_files", [])
+    # ---------- MAIN AUDIO ----------
+    if text == "🎛️ Audio Lab":
+        context.user_data.pop("audio_action", None)
+        context.user_data.pop("audio_input", None)
 
-    if len(files) < 2:
-        await q.edit_message_text(
-            "❌ حداقل دو فایل لازم است.",
-            reply_markup=back_buttons()
+        await send_audio_menu(update)
+        return
+
+    if text == "🏠 منوی اصلی":
+        from bot.menu import main_menu
+
+        context.user_data.pop("audio_action", None)
+        context.user_data.pop("audio_input", None)
+
+        await update.message.reply_text(
+            "🏠 منوی اصلی\n\n👇 یک بخش را انتخاب کنید:",
+            reply_markup=main_menu(),
         )
         return
 
-    try:
-        await q.edit_message_text("⏳ در حال ادغام...")
+    if text == "🔙 Audio Lab":
+        context.user_data.pop("audio_action", None)
+        context.user_data.pop("audio_input", None)
 
-        output = await merge(files)
+        await send_audio_menu(update)
+        return
 
-        await send_result(
-            q.message.chat,
-            output,
-            "🔗 فایل‌ها با موفقیت ادغام شدند."
+    # ---------- ACTIONS ----------
+    actions = {
+        "🎙️ Voice": "voice",
+        "🔄 Convert": "convert",
+        "✂️ Cut": "cut",
+        "⏩ Speed": "speed",
+        "🔊 Volume": "volume",
+        "🎵 Pitch": "pitch",
+        "🔇 Silence": "silence",
+        "↩️ Reverse": "reverse",
+        "📦 Compress": "compress",
+        "〰️ Waveform": "waveform",
+        "📊 Spectrogram": "spectrogram",
+        "🎬 Extract Audio": "extract",
+        "ℹ️ File Info": "info",
+        "🏷️ Metadata": "metadata",
+    }
+
+    if text in actions:
+        context.user_data["audio_action"] = actions[text]
+
+        if text == "🎬 Extract Audio":
+            msg = "🎬 یک ویدیو ارسال کنید:"
+        elif text == "ℹ️ File Info":
+            msg = "ℹ️ فایل صوتی یا ویدیو را ارسال کنید:"
+        elif text == "🏷️ Metadata":
+            msg = "🏷️ فایل صوتی را ارسال کنید:"
+        else:
+            msg = f"{text}\n\n📎 فایل موردنظر را ارسال کنید:"
+
+        await update.message.reply_text(
+            msg,
+            reply_markup=back_menu(),
         )
+        return
 
-    except Exception as e:
-        await q.edit_message_text(
-            f"❌ خطا:\n{str(e)[-1200:]}",
-            reply_markup=back_buttons()
-        )
+    # ---------- FORMAT ----------
+    formats = {
+        "MP3": "mp3",
+        "WAV": "wav",
+        "OGG": "ogg",
+        "FLAC": "flac",
+        "M4A": "m4a",
+    }
 
-    finally:
-        for path in files:
+    if text in formats and context.user_data.get("audio_input"):
+        input_file = Path(context.user_data["audio_input"])
+        output = input_file.parent / f"converted.{formats[text]}"
+
+        try:
+            convert(input_file, output, formats[text])
+            context.user_data.pop("audio_input", None)
+            context.user_data.pop("audio_action", None)
+
+            await send_result(update, output, f"🔄 تبدیل به {text} انجام شد")
+        except Exception as e:
+            await update.message.reply_text(
+                f"❌ خطا:\n{e}",
+                reply_markup=audio_menu(),
+            )
+        return
+
+    # ---------- SPEED ----------
+    if text in ["0.5x", "0.75x", "1.25x", "1.5x", "2x"]:
+        input_file = context.user_data.get("audio_input")
+
+        if input_file:
+            factor = float(text.replace("x", ""))
+            input_file = Path(input_file)
+            output = input_file.parent / "speed.mp3"
+
             try:
-                os.remove(path)
-            except OSError:
-                pass
+                speed(input_file, output, factor)
 
-        context.user_data.clear()
+                context.user_data.pop("audio_input", None)
+                context.user_data.pop("audio_action", None)
+
+                await send_result(
+                    update,
+                    output,
+                    f"⏩ سرعت {text} اعمال شد",
+                )
+            except Exception as e:
+                await update.message.reply_text(
+                    f"❌ خطا:\n{e}",
+                    reply_markup=audio_menu(),
+                )
+            return
+
+    # ---------- VOLUME ----------
+    if text in ["50%", "75%", "100%", "125%", "150%", "200%"]:
+        input_file = context.user_data.get("audio_input")
+
+        if input_file:
+            percent = int(text.replace("%", ""))
+            input_file = Path(input_file)
+            output = input_file.parent / "volume.mp3"
+
+            try:
+                change_volume(input_file, output, percent / 100)
+
+                context.user_data.pop("audio_input", None)
+                context.user_data.pop("audio_action", None)
+
+                await send_result(
+                    update,
+                    output,
+                    f"🔊 Volume روی {text} تنظیم شد",
+                )
+            except Exception as e:
+                await update.message.reply_text(
+                    f"❌ خطا:\n{e}",
+                    reply_markup=audio_menu(),
+                )
+            return
+
+    # ---------- PITCH ----------
+    if text in ["-2", "-1", "0", "+1", "+2"]:
+        input_file = context.user_data.get("audio_input")
+
+        if input_file:
+            semitones = int(text)
+            input_file = Path(input_file)
+            output = input_file.parent / "pitch.mp3"
+
+            try:
+                pitch(input_file, output, semitones)
+
+                context.user_data.pop("audio_input", None)
+                context.user_data.pop("audio_action", None)
+
+                await send_result(
+                    update,
+                    output,
+                    f"🎵 Pitch {text} اعمال شد",
+                )
+            except Exception as e:
+                await update.message.reply_text(
+                    f"❌ خطا:\n{e}",
+                    reply_markup=audio_menu(),
+                )
+            return
+
+    # ---------- CUT ----------
+    if text in ["5 ثانیه", "10 ثانیه", "30 ثانیه", "60 ثانیه"]:
+        input_file = context.user_data.get("audio_input")
+
+        if input_file:
+            seconds = int(text.split()[0])
+            input_file = Path(input_file)
+            output = input_file.parent / "cut.mp3"
+
+            try:
+                cut(input_file, output, 0, seconds)
+
+                context.user_data.pop("audio_input", None)
+                context.user_data.pop("audio_action", None)
+
+                await send_result(
+                    update,
+                    output,
+                    f"✂️ {seconds} ثانیه اول جدا شد",
+                )
+            except Exception as e:
+                await update.message.reply_text(
+                    f"❌ خطا:\n{e}",
+                    reply_markup=audio_menu(),
+                )
+            return
+
+
+async def audio_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("audio_action"):
+        await process_audio(update, context)
 
 
 def register_audio_handlers(application):
-    application.add_handler(
-        CallbackQueryHandler(
-            audio_callback,
-            pattern=r"^(lab_audio|audio_)"
-        )
-    )
-
-    application.add_handler(
-        CallbackQueryHandler(
-            merge_done,
-            pattern=r"^audio_merge_done$"
-        )
-    )
-
+    # اول متن‌های Audio
     application.add_handler(
         MessageHandler(
-            filters.AUDIO |
-            filters.VOICE |
-            filters.VIDEO |
-            filters.Document.ALL,
-            audio_media_handler
-        )
+            filters.TEXT & ~filters.COMMAND,
+            audio_text,
+        ),
+        group=0,
+    )
+
+    # بعد فایل‌های صوتی / ویدیویی
+    application.add_handler(
+        MessageHandler(
+            filters.AUDIO
+            | filters.VOICE
+            | filters.VIDEO
+            | filters.Document.ALL,
+            audio_media,
+        ),
+        group=0,
     )
