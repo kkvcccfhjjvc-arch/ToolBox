@@ -4,7 +4,7 @@ import uuid
 import subprocess
 import shutil
 
-from pypdf import PdfReader, PdfWriter, PdfMerger
+from pypdf import PdfReader, PdfWriter
 from PIL import Image
 
 TMP = Path("temp/pdf")
@@ -52,16 +52,23 @@ def images_to_pdf(files, output):
 
 
 def merge_pdfs(files, output):
-    merger = PdfMerger()
+    writer = PdfWriter()
 
     for path in files:
-        merger.append(path)
+        reader = PdfReader(path)
 
-    merger.write(output)
-    merger.close()
+        if reader.is_encrypted:
+            raise RuntimeError(
+                f"فایل PDF رمزگذاری شده است: {Path(path).name}"
+            )
+
+        for page in reader.pages:
+            writer.add_page(page)
+
+    with open(output, "wb") as f:
+        writer.write(f)
 
     return output
-
 
 def split_pdf(src, output_dir):
     output_dir = Path(output_dir)
