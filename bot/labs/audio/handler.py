@@ -309,7 +309,7 @@ async def process_audio(update, context):
     try:
         if action == "voice":
             output = folder / "voice.ogg"
-            convert(path, output)
+            await convert(path, output)
             await update.message.reply_voice(
                 voice=open(output, "rb"),
                 caption="🎙️ آماده شد",
@@ -358,22 +358,22 @@ async def process_audio(update, context):
 
         elif action == "reverse":
             output = folder / "reverse.mp3"
-            reverse(path, output)
+            await reverse(path, output)
             await send_result(update, output, "↩️ Reverse انجام شد")
 
         elif action == "silence":
             output = folder / "silence_removed.mp3"
-            silence_remove(path, output)
+            await silence_remove(path, output)
             await send_result(update, output, "🔇 سکوت حذف شد")
 
         elif action == "compress":
             output = folder / "compressed.mp3"
-            compress(path, output)
+            await compress(path, output)
             await send_result(update, output, "📦 فشرده‌سازی انجام شد")
 
         elif action == "waveform":
             output = folder / "waveform.png"
-            waveform(path, output)
+            await waveform(path, output)
 
             with open(output, "rb") as f:
                 await update.message.reply_photo(
@@ -384,7 +384,7 @@ async def process_audio(update, context):
 
         elif action == "spectrogram":
             output = folder / "spectrogram.png"
-            spectrogram(path, output)
+            await spectrogram(path, output)
 
             with open(output, "rb") as f:
                 await update.message.reply_photo(
@@ -395,11 +395,11 @@ async def process_audio(update, context):
 
         elif action == "extract":
             output = folder / "audio.mp3"
-            extract_audio(path, output)
+            await extract_audio(path, output)
             await send_result(update, output, "🎬 Audio استخراج شد")
 
         elif action == "info":
-            info = ffprobe(path)
+            info = await ffprobe(path)
 
             await update.message.reply_text(
                 "ℹ️ File Info\n\n"
@@ -408,7 +408,7 @@ async def process_audio(update, context):
             )
 
         elif action == "metadata":
-            info = ffprobe(path)
+            info = await ffprobe(path)
 
             await update.message.reply_text(
                 "🏷️ Metadata\n\n"
@@ -512,7 +512,7 @@ async def audio_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         output = input_file.parent / f"converted.{formats[text]}"
 
         try:
-            convert(input_file, output)
+            await convert(input_file, output)
             context.user_data.pop("audio_input", None)
             context.user_data.pop("audio_action", None)
 
@@ -534,7 +534,7 @@ async def audio_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             output = input_file.parent / "speed.mp3"
 
             try:
-                speed(input_file, output, factor)
+                await speed(input_file, output, factor)
 
                 context.user_data.pop("audio_input", None)
                 context.user_data.pop("audio_action", None)
@@ -561,7 +561,7 @@ async def audio_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             output = input_file.parent / "volume.mp3"
 
             try:
-                change_volume(input_file, output, percent / 100)
+                await change_volume(input_file, output, percent / 100)
 
                 context.user_data.pop("audio_input", None)
                 context.user_data.pop("audio_action", None)
@@ -588,7 +588,7 @@ async def audio_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             output = input_file.parent / "pitch.mp3"
 
             try:
-                pitch(input_file, output, semitones)
+                await pitch(input_file, output, semitones)
 
                 context.user_data.pop("audio_input", None)
                 context.user_data.pop("audio_action", None)
@@ -615,7 +615,7 @@ async def audio_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             output = input_file.parent / "cut.mp3"
 
             try:
-                cut(input_file, output, 0, seconds)
+                await cut(input_file, output, 0, seconds)
 
                 context.user_data.pop("audio_input", None)
                 context.user_data.pop("audio_action", None)
