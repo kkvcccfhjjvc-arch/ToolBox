@@ -177,83 +177,169 @@ async def download_photo(update, context):
 async def ocr_image(path):
     try:
         import pytesseract
-        from PIL import Image, ImageOps, ImageEnhance, ImageFilter
-
-        img = Image.open(path).convert("RGB")
-
-        results = []
-
-        # حالت 1: تصویر اصلی
-        for lang in ("fas+eng", "eng"):
-            try:
-                text = pytesseract.image_to_string(
-                    img,
-                    lang=lang,
-                    config="--oem 3 --psm 6"
-                ).strip()
-
-                if text:
-                    results.append(text)
-            except Exception:
-                pass
-
-        # حالت 2: بزرگ‌نمایی + کنتراست
-        scale = 2
-        img2 = img.resize(
-            (img.width * scale, img.height * scale),
-            Image.Resampling.LANCZOS
+        from PIL import (
+            Image,
+            ImageOps,
+            ImageEnhance,
+            ImageFilter,
         )
 
-        img2 = ImageOps.grayscale(img2)
-        img2 = ImageOps.autocontrast(img2)
-        img2 = ImageEnhance.Sharpness(img2).enhance(2)
+        original = Image.open(path).convert("RGB")
 
-        for lang in ("fas+eng", "eng"):
-            try:
-                text = pytesseract.image_to_string(
-                    img2,
-                    lang=lang,
-                    config="--oem 3 --psm 6"
-                ).strip()
+        candidates = []
 
-                if text:
-                    results.append(text)
-            except Exception:
-                pass
+        # -------------------------------------------------
+        # 1. تصویر اصلی
+        # -------------------------------------------------
+        images = [original]
 
-        # حالت 3: مناسب عکس‌های متن‌دار با پس‌زمینه ساده
-        try:
-            threshold = img2.point(
-                lambda p: 255 if p > 160 else 0
+        # -------------------------------------------------
+        # 2. بزرگ‌نمایی
+        # -------------------------------------------------
+        for scale in (2, 3):
+            img = original.resize(
+                (
+                    original.width * scale,
+                    original.height * scale
+                ),
+                Image.Resampling.LANCZOS
             )
+            images.append(img)
 
-            for lang in ("fas+eng", "eng"):
-                try:
-                    text = pytesseract.image_to_string(
-                        threshold,
-                        lang=lang,
-                        config="--oem 3 --psm 6"
-                    ).strip()
+        # -------------------------------------------------
+        # 3. preprocessing
+        # -------------------------------------------------
+        processed = []
 
-                    if text:
-                        results.append(text)
-                except Exception:
-                    pass
+        for img in images:
+            gray = ImageOps.grayscale(img)
+
+            # افزایش کنتراست
+            contrast = ImageEnhance.Contrast(gray).enhance(2.0)
+
+            # شارپ کردن
+            sharp = ImageEnhance.Sharpness(contrast).enhance(2.0)
+
+            # حذف نویز جزئی
+            sharp = sharp.filter(ImageFilter.MedianFilter(size=3))
+
+            processed.append(sharp)
+
+            # threshold معمولی
+            for threshold_value in (140, 170, 200):
+                bw = sharp.point(
+                    lambda p, t=threshold_value:
+                    255 if p > t else 0
+                )
+                processed.append(bw)
+
+        # -------------------------------------------------
+        # OCR
+        # -------------------------------------------------
+        languages = []
+
+        try:
+            available = pytesseract.get_languages(config="")
         except Exception:
-            pass
+            available = ["eng"]
 
-        if not results:
+        if "fas" in available and "eng" in available:
+            languages.append("fas+eng")
+
+        if "fas" in available:
+            languages.append("fas")
+
+        if "eng" in available:
+            languages.append("eng")
+
+        if not languages:
+            languages = ["eng"]
+
+        # جلوگیری از تکرار
+        languages = list(dict.fromkeys(languages))
+
+        for img in processed:
+            for lang in languages:
+
+                for psm in (3, 6, 11, 12):
+
+                    try:
+                        text = pytesseract.image_to_string(
+                            img,
+                            lang=lang,
+                            config=f"--oem 3 --psm {psm}"
+                        ).strip()
+
+                        if not text:
+                            continue
+
+                        # حذف خروجی‌های خیلی ضعیف
+                        useful = sum(
+                            1
+                            for c in text
+                            if c.isalnum()
+                            or "\u0600" <= c <= "\u06ff"
+                        )
+
+                        if useful >= 3:
+                            candidates.append(text)
+
+                    except Exception:
+                        continue
+
+        if not candidates:
             return ""
 
-        # بهترین نتیجه = بیشترین تعداد کاراکتر مفید
-        results.sort(
-            key=lambda x: len(
-                "".join(c for c in x if c.isalnum() or "\u0600" <= c <= "\u06ff")
-            ),
-            reverse=True
-        )
+        # -------------------------------------------------
+        # انتخاب بهترین خروجی
+        # -------------------------------------------------
+        def score(text):
+            chars = [
+                c for c in text
+                if c.isalnum() or "\u0600" <= c <= "\u06ff"
+            ]
 
-        return results[0]
+            words = [
+                x for x in text.split()
+                if len(x) >= 2
+            ]
+
+            # تعداد حروف + کلمات
+            value = len(chars) + (len(words) * 4)
+
+            # خروجی‌های پر از کاراکتر عجیب امتیاز کمتر
+            weird = sum(
+                1
+                for c in text
+                if c in "`~^|{}[]<>"
+            )
+
+            value -= weird * 3
+
+            return value
+
+        candidates.sort(key=score, reverse=True)
+
+        best = candidates[0]
+
+        # -------------------------------------------------
+        # تمیز کردن خروجی
+        # -------------------------------------------------
+        lines = []
+
+        for line in best.splitlines():
+            line = line.strip()
+
+            if not line:
+                continue
+
+            # خطوط خیلی کوتاه و بی‌معنی
+            if len(line) <= 1:
+                continue
+
+            lines.append(line)
+
+        return "\n".join(lines)
 
     except Exception as e:
         raise RuntimeError(f"OCR error: {e}")
