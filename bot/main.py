@@ -19,6 +19,7 @@ from bot.labs.pdf import register_pdf_handlers
 from bot.labs.font_text import register_font_text_handlers
 from bot.labs.file import register_file_handlers
 from bot.labs.video.handler import register_video_handlers
+from bot.labs.qr import register_qr_handlers
 
 
 def main():
@@ -47,6 +48,7 @@ def main():
     register_font_text_handlers(app)
     register_file_handlers(app)
     register_video_handlers(app)
+    register_qr_handlers(app)
 
     # Main Lab Router
     # باید بعد از handlerهای اختصاصی باشد.

@@ -73,6 +73,11 @@ async def lab_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await video_lab_menu(update, context)
         return
 
+    if lab_id == "qr":
+        from bot.labs.qr.handler import qr_lab_menu
+        await qr_lab_menu(update, context)
+        return
+
     await update.effective_chat.send_message(
         f"{title}\n\n"
         "🚧 این بخش در حال ساخت است.",
