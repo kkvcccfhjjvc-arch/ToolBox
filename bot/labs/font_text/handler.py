@@ -5,6 +5,7 @@ from telegram.constants import ParseMode
 from telegram.ext import ContextTypes, MessageHandler, filters
 
 from bot.services.access import check_access
+
 from .processor import (
     fancy_fonts,
     circled,
@@ -16,8 +17,6 @@ from .processor import (
     unicode_decode,
     url_encode,
     url_decode,
-    html_encode,
-    html_decode,
     format_text,
     text_to_image,
 )
@@ -35,10 +34,19 @@ MENU_BUTTONS = [
     ["📋 Telegram Format", "🏠 Home"],
 ]
 
+MENU_SET = {
+    item
+    for row in MENU_BUTTONS
+    for item in row
+}
+
 
 def font_menu():
     return ReplyKeyboardMarkup(
-        [[KeyboardButton(x) for x in row] for row in MENU_BUTTONS],
+        [
+            [KeyboardButton(x) for x in row]
+            for row in MENU_BUTTONS
+        ],
         resize_keyboard=True,
         is_persistent=True,
     )
@@ -55,6 +63,8 @@ async def font_text_menu(update, context):
     if not await check_access(update, context):
         return
 
+    context.user_data.pop("font_text_action", None)
+
     await delete_message(update)
 
     await update.effective_chat.send_message(
@@ -64,133 +74,109 @@ async def font_text_menu(update, context):
     )
 
 
-async def process_font_text(update, context):
+async def handle_font_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
 
-    text = update.message.text
+    text = update.message.text.strip()
 
+    # ورود از منوی اصلی
     if text == "🔤 Font & Text":
         await font_text_menu(update, context)
         return
 
-    if text not in {
-        x
-        for row in MENU_BUTTONS
-        for x in row
-    }:
-        return
+    # اگر دکمه‌ای از Font & Text زده شده
+    if text in MENU_SET:
 
-    if text == "🏠 Home":
-        from bot.menu import main_menu
+        if text == "🏠 Home":
+            from bot.menu import main_menu
+
+            context.user_data.pop("font_text_action", None)
+
+            await delete_message(update)
+
+            await update.effective_chat.send_message(
+                "🧰 TOOL BOX\n\n"
+                "👇 یک بخش را انتخاب کنید:",
+                reply_markup=main_menu(),
+            )
+            return
+
+        if not await check_access(update, context):
+            return
+
+        context.user_data["font_text_action"] = text
 
         await delete_message(update)
 
-        await update.message.reply_text(
-            "🧰 TOOL BOX\n\n👇 یک بخش را انتخاب کنید:",
-            reply_markup=main_menu(),
-        )
-        return
+        prompts = {
+            "✨ Fancy Fonts":
+                "✨ متن خودت رو بفرست تا چند مدل فونت مختلف برات بسازم:",
 
-    if not await check_access(update, context):
-        return
+            "🔠 Case Converter":
+                "🔠 متن رو بفرست تا حالت‌های مختلف حروف ساخته بشه:",
 
-    await delete_message(update)
+            "⭕ Circled":
+                "⭕ متن رو بفرست:",
 
-    context.user_data["font_text_action"] = text
+            "🟦 Squared":
+                "🟦 متن رو بفرست:",
 
-    if text == "✨ Fancy Fonts":
+            "🖋 Script":
+                "🖋 متن انگلیسی رو بفرست:",
+
+            "🕯 Fraktur":
+                "🕯 متن انگلیسی رو بفرست:",
+
+            "Ｆ Full-width":
+                "Ｆ متن رو بفرست:",
+
+            "🔄 Reverse":
+                "🔄 متن رو بفرست:",
+
+            "🧹 Clean Text":
+                "🧹 متن رو بفرست:",
+
+            "🔢 Text Counter":
+                "🔢 متن رو بفرست:",
+
+            "🔐 Unicode Encode":
+                "🔐 متن رو بفرست:",
+
+            "🔓 Unicode Decode":
+                "🔓 کدهای Unicode رو بفرست.\n"
+                "مثال: U+0048 U+0069",
+
+            "🔗 URL Encode":
+                "🔗 متن یا URL رو بفرست:",
+
+            "🔗 URL Decode":
+                "🔗 متن Encode شده رو بفرست:",
+
+            "📝 Text → Image":
+                "📝 متن رو بفرست تا به تصویر PNG تبدیلش کنم:",
+
+            "🇮🇷 Persian Text → Image":
+                "🇮🇷 متن فارسی رو بفرست تا به تصویر تبدیلش کنم:",
+
+            "📋 Telegram Format":
+                "📋 متن رو بفرست تا فرمت‌های تلگرام رو برات بسازم:",
+        }
+
         await update.effective_chat.send_message(
-            "✨ متن خودت رو بفرست تا چند مدل فونت مختلف برات بسازم:"
+            prompts.get(text, "📝 متن رو بفرست:")
         )
+
         return
 
-    if text == "🔠 Case Converter":
-        await update.effective_chat.send_message(
-            "🔠 متن رو بفرست.\n\n"
-            "من حالت‌های UPPER / lower / Title رو برات می‌سازم:"
-        )
-        return
-
-    if text == "⭕ Circled":
-        await update.effective_chat.send_message("⭕ متن رو بفرست:")
-        return
-
-    if text == "🟦 Squared":
-        await update.effective_chat.send_message("🟦 متن رو بفرست:")
-        return
-
-    if text == "🖋 Script":
-        await update.effective_chat.send_message("🖋 متن انگلیسی رو بفرست:")
-        return
-
-    if text == "🕯 Fraktur":
-        await update.effective_chat.send_message("🕯 متن انگلیسی رو بفرست:")
-        return
-
-    if text == "Ｆ Full-width":
-        await update.effective_chat.send_message("Ｆ متن رو بفرست:")
-        return
-
-    if text == "🔄 Reverse":
-        await update.effective_chat.send_message("🔄 متن رو بفرست:")
-        return
-
-    if text == "🧹 Clean Text":
-        await update.effective_chat.send_message("🧹 متن رو بفرست:")
-        return
-
-    if text == "🔢 Text Counter":
-        await update.effective_chat.send_message("🔢 متن رو بفرست:")
-        return
-
-    if text == "🔐 Unicode Encode":
-        await update.effective_chat.send_message("🔐 متن رو بفرست:")
-        return
-
-    if text == "🔓 Unicode Decode":
-        await update.effective_chat.send_message(
-            "🔓 کدهای Unicode رو بفرست.\nمثال: U+0048 U+0069"
-        )
-        return
-
-    if text == "🔗 URL Encode":
-        await update.effective_chat.send_message("🔗 متن یا URL رو بفرست:")
-        return
-
-    if text == "🔗 URL Decode":
-        await update.effective_chat.send_message("🔗 متن Encode شده رو بفرست:")
-        return
-
-    if text == "📝 Text → Image":
-        await update.effective_chat.send_message(
-            "📝 متن رو بفرست تا به تصویر PNG تبدیلش کنم:"
-        )
-        return
-
-    if text == "🇮🇷 Persian Text → Image":
-        await update.effective_chat.send_message(
-            "🇮🇷 متن فارسی رو بفرست تا به تصویر تبدیلش کنم:"
-        )
-        return
-
-    if text == "📋 Telegram Format":
-        await update.effective_chat.send_message(
-            "📋 متن رو بفرست تا فرمت‌های تلگرام رو برات بسازم:"
-        )
-        return
-
-
-async def process_font_text_input(update, context):
-    if not update.message or not update.message.text:
-        return
-
+    # اگر منتظر متن هستیم
     action = context.user_data.get("font_text_action")
 
     if not action:
         return
 
-    text = update.message.text
+    if not await check_access(update, context):
+        return
 
     try:
         await delete_message(update)
@@ -219,10 +205,14 @@ async def process_font_text_input(update, context):
             )
 
         elif action == "⭕ Circled":
-            await update.effective_chat.send_message(circled(text))
+            await update.effective_chat.send_message(
+                circled(text)
+            )
 
         elif action == "🟦 Squared":
-            await update.effective_chat.send_message(squared(text))
+            await update.effective_chat.send_message(
+                squared(text)
+            )
 
         elif action == "🖋 Script":
             await update.effective_chat.send_message(
@@ -240,10 +230,14 @@ async def process_font_text_input(update, context):
             )
 
         elif action == "🔄 Reverse":
-            await update.effective_chat.send_message(reverse_text(text))
+            await update.effective_chat.send_message(
+                reverse_text(text)
+            )
 
         elif action == "🧹 Clean Text":
-            await update.effective_chat.send_message(clean_text(text))
+            await update.effective_chat.send_message(
+                clean_text(text)
+            )
 
         elif action == "🔢 Text Counter":
             stats = count_text(text)
@@ -276,11 +270,24 @@ async def process_font_text_input(update, context):
                 url_decode(text)
             )
 
-        elif action in {"📝 Text → Image", "🇮🇷 Persian Text → Image"}:
-            output = Path("temp") / f"text_{update.effective_user.id}.png"
-            output.parent.mkdir(parents=True, exist_ok=True)
+        elif action in {
+            "📝 Text → Image",
+            "🇮🇷 Persian Text → Image",
+        }:
+            output = (
+                Path("temp")
+                / f"text_{update.effective_user.id}.png"
+            )
 
-            text_to_image(text, str(output))
+            output.parent.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+
+            text_to_image(
+                text,
+                str(output),
+            )
 
             with open(output, "rb") as photo:
                 await update.effective_chat.send_photo(
@@ -305,8 +312,10 @@ async def process_font_text_input(update, context):
             )
 
     except Exception as e:
+        print("FONT TEXT ERROR:", repr(e))
+
         await update.effective_chat.send_message(
-            f"❌ خطا:\n{e}"
+            f"❌ خطا در پردازش:\n{e}"
         )
 
     finally:
@@ -314,18 +323,11 @@ async def process_font_text_input(update, context):
 
 
 def register_font_text_handlers(app):
+    # فقط یک Handler برای کل Font & Text
     app.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
-            process_font_text_input,
+            handle_font_text,
         ),
-        group=1,
-    )
-
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
-            process_font_text,
-        ),
-        group=3,
+        group=4,
     )
