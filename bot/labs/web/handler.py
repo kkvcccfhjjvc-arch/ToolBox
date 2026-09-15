@@ -408,5 +408,6 @@ def register_web_handlers(app):
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
             handle_web_text,
-        )
+        ),
+        group=1,
     )
