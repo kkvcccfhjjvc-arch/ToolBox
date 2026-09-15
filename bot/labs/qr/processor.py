@@ -138,18 +138,62 @@ def make_barcode(value, output):
 
 
 def image_to_qr_text(path):
+    """
+    Decode QR codes from an image using pyzbar/zbar.
+    Several image variants are tried to improve detection on
+    screenshots, compressed Telegram photos and low-contrast images.
+    """
     try:
-        import cv2
+        from pyzbar.pyzbar import decode
+    except Exception:
+        return None
 
-        image = cv2.imread(str(path))
+    try:
+        from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 
-        if image is None:
-            return None
+        original = Image.open(path).convert("RGB")
+        variants = []
 
-        detector = cv2.QRCodeDetector()
-        data, points, _ = detector.detectAndDecode(image)
+        # Original
+        variants.append(original)
 
-        return data.strip() if data else None
+        # Grayscale
+        gray = ImageOps.grayscale(original)
+        variants.append(gray)
+
+        # Contrast enhanced
+        contrast = ImageEnhance.Contrast(gray).enhance(2.0)
+        variants.append(contrast)
+
+        # Sharp
+        sharp = contrast.filter(ImageFilter.SHARPEN)
+        variants.append(sharp)
+
+        # Upscale small QR images
+        w, h = original.size
+        if max(w, h) < 1600:
+            scale = 2
+            up = original.resize(
+                (w * scale, h * scale),
+                Image.Resampling.LANCZOS
+            )
+            variants.append(up)
+            variants.append(ImageOps.grayscale(up))
+
+        # Try every variant
+        for image in variants:
+            try:
+                results = decode(image)
+
+                for result in results:
+                    data = result.data.decode("utf-8", errors="replace").strip()
+                    if data:
+                        return data
+            except Exception:
+                continue
+
+        return None
 
     except Exception:
         return None
+

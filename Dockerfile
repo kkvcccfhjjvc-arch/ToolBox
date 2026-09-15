@@ -4,6 +4,7 @@ RUN apt-get update && \
     apt-get install -y \
     ffmpeg \
     poppler-utils \
+    libzbar0 \
     tesseract-ocr \
     tesseract-ocr-fas \
     tesseract-ocr-eng \
