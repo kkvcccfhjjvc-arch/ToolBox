@@ -40,6 +40,11 @@ async def lab_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await image_menu(update, context)
         return
 
+    if text == "🔤 Font & Text":
+        from bot.labs.font_text.handler import font_text_menu
+        await font_text_menu(update, context)
+        return
+
     if text == "📄 PDF Lab":
         from bot.labs.pdf.handler import pdf_menu
         await pdf_menu(update, context)
