@@ -50,6 +50,11 @@ async def lab_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await pdf_menu(update, context)
         return
 
+    if text == "📦 File Lab":
+        from bot.labs.file.handler import file_lab_menu
+        await file_lab_menu(update, context)
+        return
+
     await update.message.reply_text(
         f"{LABS[text]}\n\n"
         "🚧 این بخش در حال ساخت است.",
