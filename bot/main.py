@@ -2,6 +2,8 @@ from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
+    MessageHandler,
+    filters,
 )
 
 from config import BOT_TOKEN
@@ -28,21 +30,42 @@ def main():
 
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # Commands
+    # =========================
+    # COMMANDS
+    # =========================
+
     app.add_handler(
-        CommandHandler("start", start)
+        CommandHandler("start", start),
+        group=0,
     )
 
     app.add_handler(
-        CommandHandler("admin", admin)
+        CommandHandler("admin", admin),
+        group=0,
     )
 
     app.add_handler(
-        CommandHandler("help", help_command)
+        CommandHandler("help", help_command),
+        group=0,
     )
 
-    # Lab handlers
-    # هر ماژول فقط مسئول قابلیت‌های خودش است.
+    # =========================
+    # CENTRAL LAB ROUTER
+    # MUST RUN BEFORE LAB HANDLERS
+    # =========================
+
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            lab_menu,
+        ),
+        group=0,
+    )
+
+    # =========================
+    # LAB HANDLERS
+    # =========================
+
     register_audio_handlers(app)
     register_image_handlers(app)
     register_pdf_handlers(app)
@@ -52,28 +75,19 @@ def main():
     register_qr_handlers(app)
     register_web_handlers(app)
 
-    # Main Lab Router
-    # باید بعد از handlerهای اختصاصی باشد.
-    from telegram.ext import MessageHandler, filters
+    # =========================
+    # CALLBACKS
+    # =========================
 
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
-            lab_menu,
-        ),
-        group=10,
-    )
-
-    # Callback handlers
     app.add_handler(
         CallbackQueryHandler(callbacks),
-        group=20,
+        group=2,
     )
 
     print("🧰 Tool Box is running...")
     print(
         "📢 Force Join:",
-        __import__("config").CHANNEL
+        __import__("config").CHANNEL,
     )
 
     app.run_polling(
