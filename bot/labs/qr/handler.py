@@ -343,3 +343,21 @@ async def handle_qr_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"❌ خطا در اسکن QR:\n{str(e)}"
         )
 
+
+
+def register_qr_handlers(app):
+    # Text buttons / QR actions
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            handle_qr_text,
+        )
+    )
+
+    # QR scanner: normal Telegram photos + image documents
+    app.add_handler(
+        MessageHandler(
+            filters.PHOTO | filters.Document.IMAGE,
+            handle_qr_image,
+        )
+    )
