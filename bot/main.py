@@ -2,6 +2,8 @@ from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
+    MessageHandler,
+    filters,
 )
 
 from config import BOT_TOKEN
@@ -11,10 +13,12 @@ from bot.handlers.admin import admin
 from bot.handlers.help import help_command
 from bot.handlers.callbacks import callbacks
 from bot.handlers.lab_menu import lab_menu
+
 from bot.labs.audio import register_audio_handlers
 from bot.labs.image import register_image_handlers
 from bot.labs.pdf import register_pdf_handlers
 from bot.labs.font_text import register_font_text_handlers
+from bot.labs.file import register_file_handlers
 
 
 def main():
@@ -22,19 +26,19 @@ def main():
 
     app = Application.builder().token(BOT_TOKEN).build()
 
+    # Commands
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("admin", admin))
     app.add_handler(CommandHandler("help", help_command))
 
-    # Audio Reply Keyboard
+    # Labs
     register_audio_handlers(app)
     register_image_handlers(app)
     register_pdf_handlers(app)
     register_font_text_handlers(app)
+    register_file_handlers(app)
 
-    # سایر Lab ها
-    from telegram.ext import MessageHandler, filters
-
+    # Main menu
     app.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
@@ -43,7 +47,7 @@ def main():
         group=10,
     )
 
-    # Callback های قدیمی برای Force Join و بخش‌های دیگر
+    # Callback queries
     app.add_handler(
         CallbackQueryHandler(callbacks),
         group=20,
