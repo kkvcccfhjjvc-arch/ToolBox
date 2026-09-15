@@ -309,7 +309,7 @@ async def process_audio(update, context):
     try:
         if action == "voice":
             output = folder / "voice.ogg"
-            convert(path, output, "ogg")
+            convert(path, output)
             await update.message.reply_voice(
                 voice=open(output, "rb"),
                 caption="🎙️ آماده شد",
@@ -512,7 +512,7 @@ async def audio_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         output = input_file.parent / f"converted.{formats[text]}"
 
         try:
-            convert(input_file, output, formats[text])
+            convert(input_file, output)
             context.user_data.pop("audio_input", None)
             context.user_data.pop("audio_action", None)
 
