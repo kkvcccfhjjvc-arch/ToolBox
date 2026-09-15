@@ -137,63 +137,182 @@ def make_barcode(value, output):
         return make_qr(value, output)
 
 
+
 def image_to_qr_text(path):
     """
-    Decode QR codes from an image using pyzbar/zbar.
-    Several image variants are tried to improve detection on
-    screenshots, compressed Telegram photos and low-contrast images.
+    Robust QR decoder:
+    1. OpenCV QRCodeDetector
+    2. OpenCV multi QR detection
+    3. Several resized/gray/threshold variants
+    4. pyzbar/ZBar fallback
     """
     try:
-        from pyzbar.pyzbar import decode
+        import cv2
+        import numpy as np
     except Exception:
-        return None
+        cv2 = None
+        np = None
 
+    # ---------- OpenCV ----------
+    if cv2 is not None:
+        try:
+            image = cv2.imread(str(path))
+
+            if image is not None:
+                h, w = image.shape[:2]
+
+                variants = [image]
+
+                # Upscale small images
+                if max(w, h) < 1800:
+                    scale = 2.5
+                    up = cv2.resize(
+                        image,
+                        None,
+                        fx=scale,
+                        fy=scale,
+                        interpolation=cv2.INTER_CUBIC,
+                    )
+                    variants.append(up)
+
+                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                variants.append(gray)
+
+                # Contrast / threshold variants
+                clahe = cv2.createCLAHE(
+                    clipLimit=2.0,
+                    tileGridSize=(8, 8),
+                )
+                enhanced = clahe.apply(gray)
+                variants.append(enhanced)
+
+                _, threshold = cv2.threshold(
+                    enhanced,
+                    0,
+                    255,
+                    cv2.THRESH_BINARY + cv2.THRESH_OTSU,
+                )
+                variants.append(threshold)
+
+                adaptive = cv2.adaptiveThreshold(
+                    enhanced,
+                    255,
+                    cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                    cv2.THRESH_BINARY,
+                    31,
+                    5,
+                )
+                variants.append(adaptive)
+
+                detector = cv2.QRCodeDetector()
+
+                for img in variants:
+                    try:
+                        # Single QR
+                        data, points, _ = detector.detectAndDecode(img)
+
+                        if data and data.strip():
+                            return data.strip()
+                    except Exception:
+                        pass
+
+                    try:
+                        # Multiple QR codes
+                        ok, decoded_info, points, _ = (
+                            detector.detectAndDecodeMulti(img)
+                        )
+
+                        if ok and decoded_info:
+                            values = [
+                                x.strip()
+                                for x in decoded_info
+                                if x and x.strip()
+                            ]
+
+                            if values:
+                                return "\n".join(values)
+                    except Exception:
+                        pass
+
+                # Try rotated images
+                for angle in (90, 180, 270):
+                    try:
+                        if angle == 90:
+                            rotated = cv2.rotate(
+                                image,
+                                cv2.ROTATE_90_CLOCKWISE,
+                            )
+                        elif angle == 180:
+                            rotated = cv2.rotate(
+                                image,
+                                cv2.ROTATE_180,
+                            )
+                        else:
+                            rotated = cv2.rotate(
+                                image,
+                                cv2.ROTATE_90_COUNTERCLOCKWISE,
+                            )
+
+                        data, points, _ = detector.detectAndDecode(rotated)
+
+                        if data and data.strip():
+                            return data.strip()
+                    except Exception:
+                        pass
+
+        except Exception:
+            pass
+
+    # ---------- pyzbar / ZBar fallback ----------
     try:
+        from pyzbar.pyzbar import decode
         from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 
         original = Image.open(path).convert("RGB")
-        variants = []
+        variants = [original]
 
-        # Original
-        variants.append(original)
-
-        # Grayscale
         gray = ImageOps.grayscale(original)
         variants.append(gray)
 
-        # Contrast enhanced
-        contrast = ImageEnhance.Contrast(gray).enhance(2.0)
+        contrast = ImageEnhance.Contrast(gray).enhance(2.5)
         variants.append(contrast)
 
-        # Sharp
         sharp = contrast.filter(ImageFilter.SHARPEN)
         variants.append(sharp)
 
-        # Upscale small QR images
         w, h = original.size
-        if max(w, h) < 1600:
-            scale = 2
+
+        if max(w, h) < 2000:
             up = original.resize(
-                (w * scale, h * scale),
-                Image.Resampling.LANCZOS
+                (w * 3, h * 3),
+                Image.Resampling.LANCZOS,
             )
             variants.append(up)
             variants.append(ImageOps.grayscale(up))
 
-        # Try every variant
-        for image in variants:
+        for img in variants:
             try:
-                results = decode(image)
+                results = decode(img)
+
+                values = []
 
                 for result in results:
-                    data = result.data.decode("utf-8", errors="replace").strip()
-                    if data:
-                        return data
-            except Exception:
-                continue
+                    data = result.data.decode(
+                        "utf-8",
+                        errors="replace",
+                    ).strip()
 
-        return None
+                    if data:
+                        values.append(data)
+
+                if values:
+                    return "\n".join(values)
+
+            except Exception:
+                pass
 
     except Exception:
-        return None
+        pass
+
+    return None
 

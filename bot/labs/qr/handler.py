@@ -273,6 +273,7 @@ async def handle_qr_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+
 async def handle_qr_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("active_lab") != "qr":
         return
@@ -286,15 +287,37 @@ async def handle_qr_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_access(update, context):
         return
 
-    if not update.message.photo:
-        return
-
     try:
-        photo = update.message.photo[-1]
-        file = await photo.get_file()
+        telegram_file = None
+        extension = ".jpg"
 
-        source = new_file(".jpg")
-        await file.download_to_drive(str(source))
+        # Normal Telegram photo
+        if update.message.photo:
+            photo = update.message.photo[-1]
+            telegram_file = await photo.get_file()
+            extension = ".jpg"
+
+        # Image sent as Telegram document
+        elif update.message.document:
+            document = update.message.document
+
+            mime = document.mime_type or ""
+
+            if not mime.startswith("image/"):
+                return
+
+            telegram_file = await document.get_file()
+
+            name = document.file_name or "image.jpg"
+
+            if "." in name:
+                extension = "." + name.rsplit(".", 1)[1].lower()
+
+        else:
+            return
+
+        source = new_file(extension)
+        await telegram_file.download_to_drive(str(source))
 
         result = image_to_qr_text(source)
 
@@ -302,35 +325,21 @@ async def handle_qr_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if result:
             await update.effective_chat.send_message(
-                f"📷 QR پیدا شد:\n\n<code>{result}</code>",
+                "📷 QR پیدا شد:\n\n"
+                f"<code>{result}</code>",
                 parse_mode="HTML",
             )
         else:
             await update.effective_chat.send_message(
-                "❌ QR قابل شناسایی پیدا نشد."
+                "❌ QR قابل شناسایی پیدا نشد.\n\n"
+                "یک عکس واضح‌تر از QR ارسال کن."
             )
 
         context.user_data.pop("qr_action", None)
+        context.user_data.pop("qr_step", None)
 
     except Exception as e:
         await update.effective_chat.send_message(
             f"❌ خطا در اسکن QR:\n{str(e)}"
         )
 
-
-def register_qr_handlers(application):
-    application.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
-            handle_qr_text,
-        ),
-        group=7,
-    )
-
-    application.add_handler(
-        MessageHandler(
-            filters.PHOTO,
-            handle_qr_image,
-        ),
-        group=7,
-    )
