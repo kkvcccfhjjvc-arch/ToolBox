@@ -96,6 +96,9 @@ async def image_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def image_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("active_lab") != "image":
+        return
+
     if not update.message or not update.message.text:
         return
 
@@ -453,6 +456,9 @@ async def process_image(update, context, path):
         )
 
 async def image_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("active_lab") != "image":
+        return
+
     if not context.user_data.get("image_action"):
         return
 

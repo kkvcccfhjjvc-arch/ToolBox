@@ -75,15 +75,13 @@ async def font_text_menu(update, context):
 
 
 async def handle_font_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("active_lab") != "font_text":
+        return
+
     if not update.message or not update.message.text:
         return
 
     text = update.message.text.strip()
-
-    # ورود از منوی اصلی
-    if text == "🔤 Font & Text":
-        await font_text_menu(update, context)
-        return
 
     # اگر دکمه‌ای از Font & Text زده شده
     if text in MENU_SET:

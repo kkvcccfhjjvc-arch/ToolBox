@@ -2,12 +2,11 @@ from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
-    MessageHandler,
-    filters,
 )
 
 from config import BOT_TOKEN
 from bot.database import init_db
+
 from bot.handlers.start import start
 from bot.handlers.admin import admin
 from bot.handlers.help import help_command
@@ -27,18 +26,30 @@ def main():
     app = Application.builder().token(BOT_TOKEN).build()
 
     # Commands
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("admin", admin))
-    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(
+        CommandHandler("start", start)
+    )
 
-    # Labs
+    app.add_handler(
+        CommandHandler("admin", admin)
+    )
+
+    app.add_handler(
+        CommandHandler("help", help_command)
+    )
+
+    # Lab handlers
+    # هر ماژول فقط مسئول قابلیت‌های خودش است.
     register_audio_handlers(app)
     register_image_handlers(app)
     register_pdf_handlers(app)
     register_font_text_handlers(app)
     register_file_handlers(app)
 
-    # Main menu
+    # Main Lab Router
+    # باید بعد از handlerهای اختصاصی باشد.
+    from telegram.ext import MessageHandler, filters
+
     app.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
@@ -47,7 +58,7 @@ def main():
         group=10,
     )
 
-    # Callback queries
+    # Callback handlers
     app.add_handler(
         CallbackQueryHandler(callbacks),
         group=20,

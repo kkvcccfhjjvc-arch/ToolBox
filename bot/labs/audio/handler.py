@@ -428,20 +428,15 @@ async def process_audio(update, context):
 
 
 async def audio_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("active_lab") != "audio":
+        return
+
     if not await check_access(update, context):
         return
 
     text = update.message.text
 
     await delete_selection(update)
-
-    # ---------- MAIN AUDIO ----------
-    if text == "🎛️ Audio Lab":
-        context.user_data.pop("audio_action", None)
-        context.user_data.pop("audio_input", None)
-
-        await send_audio_menu(update)
-        return
 
     if text == "🏠 منوی اصلی":
         from bot.menu import main_menu
@@ -634,6 +629,9 @@ async def audio_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def audio_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("active_lab") != "audio":
+        return
+
     if context.user_data.get("audio_action"):
         await process_audio(update, context)
 

@@ -84,6 +84,9 @@ async def image_to_pdf_start(update, context):
 
 
 async def pdf_action_start(update, context):
+    if context.user_data.get("active_lab") != "pdf":
+        return
+
     if not update.message:
         return
 
@@ -143,6 +146,9 @@ async def pdf_action_start(update, context):
 
 
 async def pdf_document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("active_lab") != "pdf":
+        return
+
     if not update.message or not update.message.document:
         return
 

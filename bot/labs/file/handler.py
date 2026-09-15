@@ -99,16 +99,14 @@ async def download_file(message):
 
 
 async def handle_file_lab(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get("active_lab") != "file":
+        return
+
     if not update.message:
         return
 
     message = update.message
     text = message.text.strip() if message.text else ""
-
-    # ورود به File Lab
-    if text == "📦 File Lab":
-        await file_lab_menu(update, context)
-        return
 
     # Home
     if text == "🏠 Home":
