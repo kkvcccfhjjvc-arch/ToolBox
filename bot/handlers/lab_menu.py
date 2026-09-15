@@ -88,6 +88,11 @@ async def lab_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await developer_lab_menu(update, context)
         return
 
+    if lab_id == "utility":
+        from bot.labs.utility.handler import utility_lab_menu
+        await utility_lab_menu(update, context)
+        return
+
     await update.effective_chat.send_message(
         f"{title}\n\n"
         "🚧 این بخش در حال ساخت است.",
