@@ -177,16 +177,83 @@ async def download_photo(update, context):
 async def ocr_image(path):
     try:
         import pytesseract
+        from PIL import Image, ImageOps, ImageEnhance, ImageFilter
 
-        text = pytesseract.image_to_string(
-            path,
-            lang="eng+fas"
+        img = Image.open(path).convert("RGB")
+
+        results = []
+
+        # حالت 1: تصویر اصلی
+        for lang in ("fas+eng", "eng"):
+            try:
+                text = pytesseract.image_to_string(
+                    img,
+                    lang=lang,
+                    config="--oem 3 --psm 6"
+                ).strip()
+
+                if text:
+                    results.append(text)
+            except Exception:
+                pass
+
+        # حالت 2: بزرگ‌نمایی + کنتراست
+        scale = 2
+        img2 = img.resize(
+            (img.width * scale, img.height * scale),
+            Image.Resampling.LANCZOS
         )
 
-        if not text.strip():
-            text = pytesseract.image_to_string(path)
+        img2 = ImageOps.grayscale(img2)
+        img2 = ImageOps.autocontrast(img2)
+        img2 = ImageEnhance.Sharpness(img2).enhance(2)
 
-        return text.strip()
+        for lang in ("fas+eng", "eng"):
+            try:
+                text = pytesseract.image_to_string(
+                    img2,
+                    lang=lang,
+                    config="--oem 3 --psm 6"
+                ).strip()
+
+                if text:
+                    results.append(text)
+            except Exception:
+                pass
+
+        # حالت 3: مناسب عکس‌های متن‌دار با پس‌زمینه ساده
+        try:
+            threshold = img2.point(
+                lambda p: 255 if p > 160 else 0
+            )
+
+            for lang in ("fas+eng", "eng"):
+                try:
+                    text = pytesseract.image_to_string(
+                        threshold,
+                        lang=lang,
+                        config="--oem 3 --psm 6"
+                    ).strip()
+
+                    if text:
+                        results.append(text)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        if not results:
+            return ""
+
+        # بهترین نتیجه = بیشترین تعداد کاراکتر مفید
+        results.sort(
+            key=lambda x: len(
+                "".join(c for c in x if c.isalnum() or "\u0600" <= c <= "\u06ff")
+            ),
+            reverse=True
+        )
+
+        return results[0]
 
     except Exception as e:
         raise RuntimeError(f"OCR error: {e}")
