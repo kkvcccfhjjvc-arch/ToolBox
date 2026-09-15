@@ -1,5 +1,5 @@
 from pathlib import Path
-from urllib.parse import urlparse, parse_qs, unquote
+from urllib.parse import urlparse, parse_qs
 import socket
 import re
 import uuid
@@ -201,7 +201,6 @@ def article_reader(url):
         if len(text) >= 30:
             paragraphs.append(text)
 
-    # Remove duplicates while preserving order
     seen = set()
     result = []
 
@@ -213,7 +212,16 @@ def article_reader(url):
     return title, "\n\n".join(result[:100])
 
 
+# =========================================================
+# WIKIPEDIA
+# =========================================================
+
 def wikipedia_search(query):
+    query = query.strip()
+
+    if not query:
+        return []
+
     response = requests.get(
         "https://en.wikipedia.org/w/api.php",
         params={
@@ -224,8 +232,11 @@ def wikipedia_search(query):
             "utf8": 1,
             "srlimit": 5,
         },
-        headers=HEADERS,
-        timeout=15,
+        headers={
+            **HEADERS,
+            "Accept": "application/json",
+        },
+        timeout=20,
     )
 
     response.raise_for_status()
@@ -238,6 +249,7 @@ def wikipedia_search(query):
         "search", []
     ):
         title = item.get("title", "")
+
         snippet = BeautifulSoup(
             item.get("snippet", ""),
             "html.parser",
@@ -256,111 +268,303 @@ def wikipedia_search(query):
 
 
 def wikipedia_summary(query):
+    query = query.strip()
+
+    # اول جستجوی API معمولی
+    results = wikipedia_search(query)
+
+    if not results:
+        return None
+
+    # بهترین نتیجه را انتخاب کن
+    title = results[0]["title"]
+
     response = requests.get(
         "https://en.wikipedia.org/api/rest_v1/page/summary/"
-        + requests.utils.quote(query),
-        headers=HEADERS,
-        timeout=15,
+        + requests.utils.quote(title),
+        headers={
+            **HEADERS,
+            "Accept": "application/json",
+        },
+        timeout=20,
     )
 
     if response.status_code != 200:
-        raise ValueError("صفحه Wikipedia پیدا نشد.")
+        return {
+            "title": title,
+            "extract": results[0].get(
+                "snippet",
+                "توضیحی پیدا نشد.",
+            ),
+            "url": results[0]["url"],
+        }
 
     data = response.json()
 
     return {
-        "title": data.get("title", query),
+        "title": data.get("title", title),
         "extract": data.get(
             "extract",
-            "توضیحی پیدا نشد.",
+            results[0].get(
+                "snippet",
+                "توضیحی پیدا نشد.",
+            ),
         ),
         "url": (
             data.get("content_urls", {})
             .get("desktop", {})
             .get("page", "")
-        ),
+        ) or results[0]["url"],
     }
 
+
+# =========================================================
+# WEB SEARCH
+# =========================================================
 
 def web_search(query):
-    response = requests.get(
-        "https://html.duckduckgo.com/html/",
-        params={"q": query},
-        headers=HEADERS,
-        timeout=15,
-    )
+    query = query.strip()
 
-    response.raise_for_status()
+    if not query:
+        return []
 
-    soup = BeautifulSoup(
-        response.text,
-        "html.parser",
-    )
-
-    results = []
-
-    for item in soup.select(".result")[:8]:
-        a = item.select_one(".result__a")
-        snippet = item.select_one(
-            ".result__snippet"
+    # موتور اول: DuckDuckGo HTML
+    try:
+        response = requests.get(
+            "https://html.duckduckgo.com/html/",
+            params={"q": query},
+            headers=HEADERS,
+            timeout=20,
         )
 
-        if not a:
-            continue
+        response.raise_for_status()
 
-        href = a.get("href", "")
-        title = clean_text(
-            a.get_text(" ", strip=True)
+        soup = BeautifulSoup(
+            response.text,
+            "html.parser",
         )
 
-        text = clean_text(
-            snippet.get_text(" ", strip=True)
-            if snippet
-            else ""
+        results = []
+
+        for item in soup.select(".result")[:8]:
+            a = item.select_one(".result__a")
+            snippet = item.select_one(
+                ".result__snippet"
+            )
+
+            if not a:
+                continue
+
+            href = a.get("href", "")
+
+            title = clean_text(
+                a.get_text(" ", strip=True)
+            )
+
+            text = clean_text(
+                snippet.get_text(" ", strip=True)
+                if snippet
+                else ""
+            )
+
+            if title:
+                results.append({
+                    "title": title,
+                    "url": href,
+                    "snippet": text,
+                })
+
+        if results:
+            return results
+
+    except Exception:
+        pass
+
+    # Fallback: Bing HTML
+    try:
+        response = requests.get(
+            "https://www.google.com/search",
+            params={
+                "q": query,
+                "num": 8,
+            },
+            headers=HEADERS,
+            timeout=20,
         )
 
-        if title:
-            results.append({
-                "title": title,
-                "url": href,
-                "snippet": text,
-            })
+        response.raise_for_status()
 
-    return results
+        soup = BeautifulSoup(
+            response.text,
+            "html.parser",
+        )
 
+        results = []
+
+        for block in soup.select("div.MjjYud")[:8]:
+            a = block.select_one("a")
+            h3 = block.select_one("h3")
+
+            if not a or not h3:
+                continue
+
+            href = a.get("href", "")
+
+            if not href.startswith("http"):
+                continue
+
+            title = clean_text(
+                h3.get_text(" ", strip=True)
+            )
+
+            parent_text = clean_text(
+                block.get_text(" ", strip=True)
+            )
+
+            if title:
+                results.append({
+                    "title": title,
+                    "url": href,
+                    "snippet": parent_text,
+                })
+
+        return results
+
+    except Exception:
+        return []
+
+
+# =========================================================
+# WEATHER - OPEN METEO
+# =========================================================
 
 def get_weather(city):
-    response = requests.get(
-        f"https://wttr.in/{requests.utils.quote(city)}",
-        params={"format": "j1"},
+    city = city.strip()
+
+    if not city:
+        raise ValueError("نام شهر وارد نشده است.")
+
+    # پیدا کردن مختصات شهر
+    geo_response = requests.get(
+        "https://geocoding-api.open-meteo.com/v1/search",
+        params={
+            "name": city,
+            "count": 1,
+            "language": "fa",
+            "format": "json",
+        },
         headers=HEADERS,
-        timeout=15,
+        timeout=20,
     )
 
-    response.raise_for_status()
+    geo_response.raise_for_status()
 
-    data = response.json()
+    geo_data = geo_response.json()
 
-    current = data["current_condition"][0]
+    locations = geo_data.get("results", [])
+
+    if not locations:
+        # دوباره با زبان انگلیسی امتحان کن
+        geo_response = requests.get(
+            "https://geocoding-api.open-meteo.com/v1/search",
+            params={
+                "name": city,
+                "count": 1,
+                "language": "en",
+                "format": "json",
+            },
+            headers=HEADERS,
+            timeout=20,
+        )
+
+        geo_response.raise_for_status()
+
+        geo_data = geo_response.json()
+        locations = geo_data.get("results", [])
+
+    if not locations:
+        raise ValueError(
+            f"شهر «{city}» پیدا نشد."
+        )
+
+    location = locations[0]
+
+    latitude = location["latitude"]
+    longitude = location["longitude"]
+
+    weather_response = requests.get(
+        "https://api.open-meteo.com/v1/forecast",
+        params={
+            "latitude": latitude,
+            "longitude": longitude,
+            "current": (
+                "temperature_2m,"
+                "relative_humidity_2m,"
+                "apparent_temperature,"
+                "wind_speed_10m,"
+                "weather_code"
+            ),
+            "timezone": "auto",
+        },
+        headers=HEADERS,
+        timeout=20,
+    )
+
+    weather_response.raise_for_status()
+
+    weather_data = weather_response.json()
+    current = weather_data.get("current", {})
+
+    code = current.get("weather_code")
+
+    descriptions = {
+        0: "صاف",
+        1: "عمدتاً صاف",
+        2: "نیمه ابری",
+        3: "ابری",
+        45: "مه",
+        48: "مه یخ‌زن",
+        51: "نم‌نم باران",
+        53: "باران خفیف",
+        55: "باران",
+        61: "باران خفیف",
+        63: "باران متوسط",
+        65: "باران شدید",
+        71: "برف خفیف",
+        73: "برف متوسط",
+        75: "برف شدید",
+        80: "رگبار خفیف",
+        81: "رگبار متوسط",
+        82: "رگبار شدید",
+        95: "رعدوبرق",
+        96: "رعدوبرق و تگرگ",
+        99: "رعدوبرق و تگرگ شدید",
+    }
 
     return {
-        "city": city,
-        "temp": current.get("temp_C"),
-        "feels": current.get("FeelsLikeC"),
-        "humidity": current.get("humidity"),
-        "wind": current.get("windspeedKmph"),
-        "description": (
-            current.get("weatherDesc", [{}])[0]
-            .get("value", "")
+        "city": location.get("name", city),
+        "temp": current.get("temperature_2m"),
+        "feels": current.get("apparent_temperature"),
+        "humidity": current.get(
+            "relative_humidity_2m"
+        ),
+        "wind": current.get("wind_speed_10m"),
+        "description": descriptions.get(
+            code,
+            "نامشخص",
         ),
     }
 
+
+# =========================================================
+# NEWS
+# =========================================================
 
 def get_news():
     response = requests.get(
         "https://news.google.com/rss?hl=en-US&gl=US&ceid=US:en",
         headers=HEADERS,
-        timeout=15,
+        timeout=20,
     )
 
     response.raise_for_status()
@@ -401,83 +605,96 @@ def get_news():
     return results
 
 
-def dns_info(host):
-    host = host.strip()
-
-    if re.match(r"^https?://", host, re.I):
-        host = urlparse(host).hostname or host
-
-    result = {
-        "host": host,
-        "ipv4": [],
-        "aliases": [],
-    }
-
-    try:
-        data = socket.gethostbyname_ex(host)
-
-        result["aliases"] = data[1]
-        result["ipv4"] = data[2]
-
-    except Exception:
-        pass
-
-    return result
-
+# =========================================================
+# WEBPAGE -> PDF
+# =========================================================
 
 def webpage_to_pdf(url):
-    title, text = article_reader(url)
+    response = fetch_url(url)
 
-    if not text:
-        raise ValueError(
-            "متن قابل استخراج از صفحه پیدا نشد."
+    soup = BeautifulSoup(
+        response.text,
+        "html.parser",
+    )
+
+    for tag in soup(
+        [
+            "script",
+            "style",
+            "noscript",
+            "svg",
+        ]
+    ):
+        tag.decompose()
+
+    title = (
+        soup.title.get_text(
+            " ",
+            strip=True,
         )
+        if soup.title
+        else url
+    )
+
+    text = clean_text(
+        soup.get_text(" ", strip=True)
+    )
 
     output = new_file(".pdf")
 
     styles = getSampleStyleSheet()
 
-    body = styles["BodyText"]
-    body.fontSize = 10
-    body.leading = 15
-    body.alignment = TA_LEFT
-
-    heading = styles["Heading1"]
-
     doc = SimpleDocTemplate(
         str(output),
         pagesize=A4,
-        rightMargin=40,
-        leftMargin=40,
-        topMargin=40,
-        bottomMargin=40,
     )
 
-    story = []
-
-    if title:
-        story.append(
-            Paragraph(
-                escape(title),
-                heading,
-            )
-        )
-        story.append(Spacer(1, 15))
-
-    for paragraph in text.split("\n\n"):
-        paragraph = paragraph.strip()
-
-        if not paragraph:
-            continue
-
-        story.append(
-            Paragraph(
-                escape(paragraph),
-                body,
-            )
-        )
-        story.append(Spacer(1, 8))
+    story = [
+        Paragraph(
+            escape(title),
+            styles["Title"],
+        ),
+        Spacer(1, 12),
+        Paragraph(
+            escape(text[:30000]),
+            styles["BodyText"],
+        ),
+    ]
 
     doc.build(story)
 
     return output
+
+
+# =========================================================
+# URL PARSER HELPERS
+# =========================================================
+
+def dns_info(host):
+    host = host.strip()
+
+    if not host:
+        raise ValueError("دامنه وارد نشده است.")
+
+    try:
+        addresses = socket.getaddrinfo(
+            host,
+            None,
+        )
+
+        ips = sorted(
+            {
+                item[4][0]
+                for item in addresses
+            }
+        )
+
+        return ips
+
+    except Exception:
+        return []
+
+
+def url_unquote(value):
+    from urllib.parse import unquote
+    return unquote(value)
