@@ -68,6 +68,11 @@ async def lab_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await file_lab_menu(update, context)
         return
 
+    if lab_id == "video":
+        from bot.labs.video.handler import video_lab_menu
+        await video_lab_menu(update, context)
+        return
+
     await update.effective_chat.send_message(
         f"{title}\n\n"
         "🚧 این بخش در حال ساخت است.",
