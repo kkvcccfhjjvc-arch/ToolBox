@@ -35,9 +35,13 @@ async def lab_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         pass
 
+    if text == "🖼️ Image Lab":
+        from bot.labs.image.handler import image_menu
+        await image_menu(update, context)
+        return
+
     await update.message.reply_text(
         f"{LABS[text]}\n\n"
-        "🚧 این بخش در حال ساخت است.\n\n"
-        "🎛️ Audio Lab را می‌توانی از منوی پایین انتخاب کنی.",
+        "🚧 این بخش در حال ساخت است.",
         reply_markup=main_menu(),
     )
